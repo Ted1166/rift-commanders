@@ -1,69 +1,51 @@
-import type { ReactNode } from 'react';
-import ControllerConnector from '@cartridge/connector/controller';
-import { sepolia } from '@starknet-react/chains';
-import { Connector, StarknetConfig, starkscan } from '@starknet-react/core';
-import { RpcProvider, constants } from 'starknet';
-import type { Chain } from '@starknet-react/chains';
-import type { ControllerOptions } from '@cartridge/controller';
+import type { PropsWithChildren } from 'react';
+import { sepolia, mainnet } from '@starknet-react/chains';
+import {
+  jsonRpcProvider,
+  StarknetConfig,
+  starkscan,
+  argent,
+  braavos,
+} from '@starknet-react/core';
+import cartridgeConnector from '../config/cartridgeConnector';
 
-interface StarknetProviderProps {
-  children: ReactNode;
-}
+export function StarknetProvider({ children }: PropsWithChildren) {
+  const deployType = import.meta.env.VITE_PUBLIC_DEPLOY_TYPE || 'sepolia';
 
-export function StarknetProvider({ children }: StarknetProviderProps) {
-  const worldAddress = import.meta.env.VITE_PUBLIC_WORLD_ADDRESS;
-
-  // Define session policies
-  const policies = {
-    contracts: {
-      [worldAddress]: {
-        methods: [
-          // Lobby system
-          { entrypoint: "create_game" },
-          { entrypoint: "join_game" },
-          { entrypoint: "start_game" },
-          { entrypoint: "place_units" },
-          
-          // Planning system
-          { entrypoint: "commit_moves" },
-          { entrypoint: "auto_advance_if_ready" },
-          
-          // Execution system
-          { entrypoint: "execute_turn" },
-          { entrypoint: "resolve_combat" },
-          
-          // Rift system
-          { entrypoint: "trigger_rift" },
-          { entrypoint: "manual_rift_trigger" },
-        ],
-      },
-    },
+  // Get RPC URL based on environment
+  const getRpcUrl = () => {
+    switch (deployType) {
+      case 'mainnet':
+        return 'https://api.cartridge.gg/x/starknet/mainnet';
+      case 'sepolia':
+        return 'https://api.cartridge.gg/x/starknet/sepolia';
+      case 'localhost':
+        return 'http://localhost:5050';
+      default:
+        return 'https://api.cartridge.gg/x/starknet/sepolia';
+    }
   };
 
-  const options: ControllerOptions = {
-    chains: [
-      {
-        rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia",
-      },
-    ],
-    defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
-    namespace: "rift_commanders",
-    policies,
-  };
+  // Create provider with the correct RPC URL
+  const provider = jsonRpcProvider({
+    rpc: () => ({ nodeUrl: getRpcUrl() }),
+  });
 
-  const cartridge = new ControllerConnector(options) as never as Connector;
+  // Determine which chain to use
+  const chains = deployType === 'mainnet' ? [mainnet] : [sepolia];
 
-  function provider(chain: Chain) {
-    return new RpcProvider({
-      nodeUrl: 'https://api.cartridge.gg/x/starknet/sepolia',
-    });
-  }
+  // Connectors - Cartridge first, then Argent & Braavos as fallbacks
+  const connectors = [
+    cartridgeConnector,
+    argent(),
+    braavos(),
+  ];
 
   return (
     <StarknetConfig
       autoConnect
-      chains={[sepolia]}
-      connectors={[cartridge]}
+      chains={chains}
+      connectors={connectors}
       explorer={starkscan}
       provider={provider}
     >

@@ -1,95 +1,155 @@
-import { Link } from "react-router-dom";
-import { Rocket, Shield, Zap } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { useNavigate } from 'react-router-dom';
+import { useAccount, useConnect, useDisconnect } from '@starknet-react/core';
+import { Button } from '../components/ui';
+import { formatAddress } from '../utils';
+import { useState } from 'react';
 
-const Home = () => {
+export default function Home() {
+  const navigate = useNavigate();
+  const { address, status } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+  const [showWallets, setShowWallets] = useState(false);
+
+  const isConnected = status === 'connected';
+  const isConnecting = status === 'connecting';
+
+  const handleConnect = (connectorId: string) => {
+    const connector = connectors.find((c) => c.id === connectorId);
+    if (connector) {
+      connect({ connector });
+      setShowWallets(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
-      {/* Scan line effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute w-full h-px bg-primary/20 animate-scan-line" />
-      </div>
-
-      {/* Top status bar */}
-      <header className="border-b border-primary/30 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-primary text-sm">
-          <Zap className="w-4 h-4" />
-          <span>Sol System 2387</span>
+    <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+      <div className="max-w-4xl w-full px-6">
+        {/* Title */}
+        <div className="text-center mb-12">
+          <h1 className="text-6xl md:text-7xl font-bold text-tactical-green text-glow-intense tracking-wider mb-4">
+            RIFT COMMANDERS
+          </h1>
+          <div className="flex items-center justify-center space-x-2 text-tactical-green/70 mb-6">
+            <div className="w-2 h-2 bg-tactical-green rounded-full animate-pulse" />
+            <span className="text-sm uppercase tracking-widest">
+              Tactical Warfare on Starknet
+            </span>
+            <div className="w-2 h-2 bg-tactical-green rounded-full animate-pulse" />
+          </div>
+          <p className="text-tactical-green/60 text-sm font-mono max-w-2xl mx-auto leading-relaxed">
+            Strategic turn-based combat on a 5×5 battlefield. Deploy your Commander, Warrior, and Archer.
+            <br />
+            Plan moves secretly. Execute simultaneously. Survive chaos rifts. Eliminate enemy commander to win.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Rocket className="w-4 h-4 text-primary animate-pulse-glow" />
-        </div>
-      </header>
 
-      {/* Main content */}
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="max-w-4xl w-full space-y-12">
-          {/* Title */}
-          <div className="space-y-4">
-            <h1 className="text-6xl md:text-8xl font-bold text-primary text-glow-intense tracking-wider">
-              RIFT COMMANDERS
-            </h1>
-            <div className="text-2xl md:text-3xl text-primary/80 font-light tracking-widest">
-              TACTICAL WARFARE
+        {/* Main Card */}
+        <div className="border-2 border-tactical-green/30 border-glow rounded-lg p-8 bg-bg-secondary">
+          {isConnected && address ? (
+            <div className="text-center space-y-6">
+              <div>
+                <p className="text-tactical-green/60 text-xs uppercase mb-2 tracking-wider">
+                  Connected Wallet
+                </p>
+                <p className="text-tactical-green font-mono text-lg font-bold">
+                  {formatAddress(address)}
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <Button
+                  size="lg"
+                  onClick={() => navigate('/lobby')}
+                  className="flex-1"
+                >
+                  Enter Command Center
+                </Button>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={() => disconnect()}
+                >
+                  Disconnect
+                </Button>
+              </div>
             </div>
-            <p className="text-primary/60 max-w-2xl leading-relaxed">
-              Command specialized units in turn-based combat. Deploy your Commander, Warrior, and Archer 
-              on a dynamic 5×5 battlefield. Plan moves in secret, execute simultaneously, and survive 
-              unpredictable Chaos Rifts.
-            </p>
-          </div>
+          ) : (
+            <div className="text-center space-y-6">
+              <div>
+                <h2 className="text-tactical-green text-2xl font-bold mb-2 uppercase tracking-wide">
+                  Initialize System
+                </h2>
+                <p className="text-tactical-green/60 text-sm font-mono mb-4">
+                  Connect your wallet to begin
+                </p>
+              </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-4">
-            <Link to="/network">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="border-primary bg-transparent text-primary hover:bg-primary/10 border-glow text-lg px-8 group"
-              >
-                LAUNCH MISSION
-                <span className="ml-2 group-hover:translate-x-1 transition-transform">→</span>
-              </Button>
-            </Link>
-            <Link to="/manual">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="border-primary/50 bg-transparent text-primary/70 hover:bg-primary/5 text-lg px-8"
-              >
-                OPERATIONS MANUAL
-              </Button>
-            </Link>
-            <Link to="/training">
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="border-primary/50 bg-transparent text-primary/70 hover:bg-primary/5 text-lg px-8"
-              >
-                TRAINING
-              </Button>
-            </Link>
+              {!showWallets ? (
+                <Button
+                  size="lg"
+                  onClick={() => setShowWallets(true)}
+                  isLoading={isConnecting}
+                  className="w-full"
+                >
+                  {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  {connectors.map((connector) => (
+                    <button
+                      key={connector.id}
+                      onClick={() => handleConnect(connector.id)}
+                      disabled={isConnecting}
+                      className="w-full border-2 border-tactical-green/30 bg-bg-primary hover:border-tactical-green/60 hover:bg-tactical-green/5 text-tactical-green font-mono py-4 px-6 rounded transition-all disabled:opacity-50 flex items-center justify-between group"
+                    >
+                      <span className="uppercase tracking-wider font-bold">
+                        {connector.name}
+                      </span>
+                      <span className="text-tactical-green/60 text-xs group-hover:text-tactical-green transition-colors">
+                        {connector.id.includes('controller') && '🎮 Best for Gaming'}
+                        {connector.id === 'argentX' && '🦊 Most Popular'}
+                        {connector.id === 'braavos' && '⚡ Fast & Secure'}
+                      </span>
+                    </button>
+                  ))}
+                  
+                  <button
+                    onClick={() => setShowWallets(false)}
+                    className="w-full text-tactical-green/60 text-sm font-mono hover:text-tactical-green transition-colors py-2"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              )}
+
+              <p className="text-tactical-green/40 text-xs font-mono">
+                Supports Cartridge Controller, Argent X, and Braavos
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Features */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div className="border border-tactical-green/20 rounded p-4 bg-bg-secondary">
+            <h3 className="text-tactical-green font-mono text-sm uppercase mb-2">⚔️ Strategic</h3>
+            <p className="text-tactical-green/60 text-xs">Plan your moves carefully. Every decision matters.</p>
+          </div>
+          <div className="border border-tactical-green/20 rounded p-4 bg-bg-secondary">
+            <h3 className="text-tactical-green font-mono text-sm uppercase mb-2">⚡ Simultaneous</h3>
+            <p className="text-tactical-green/60 text-xs">Actions execute at once. Predict your opponent.</p>
+          </div>
+          <div className="border border-tactical-green/20 rounded p-4 bg-bg-secondary">
+            <h3 className="text-tactical-green font-mono text-sm uppercase mb-2">🌀 Chaotic</h3>
+            <p className="text-tactical-green/60 text-xs">Chaos rifts change terrain. Adapt or perish.</p>
           </div>
         </div>
-      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-primary/30 px-6 py-3 flex items-center justify-between text-sm text-primary/50">
-        <div className="flex items-center gap-2">
-          <Shield className="w-4 h-4" />
-          <span>Rift Commanders © 2387</span>
+        {/* Footer */}
+        <div className="text-center mt-8 text-tactical-green/50 text-xs font-mono">
+          <p>POWERED BY DOJO ENGINE • STARKNET SEPOLIA</p>
         </div>
-        <div className="flex items-center gap-6">
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-primary rounded-full animate-pulse-glow" />
-            System Online
-          </span>
-          <button className="hover:text-primary transition-colors">Support</button>
-          <button className="hover:text-primary transition-colors">Terms</button>
-        </div>
-      </footer>
+      </div>
     </div>
   );
-};
-
-export default Home;
+}

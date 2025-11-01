@@ -1,79 +1,101 @@
 import { useState } from 'react';
-import { useGameStore } from '../lib/stores/gameStore';
+import { useAccount } from '@starknet-react/core';
+import { SystemCalls } from '../dojo/systemCalls';
+import type { PlannedMove } from '../types/game';
 
-export const useGameActions = (account: any) => {
+export function useGameActions() {
+  const { account } = useAccount();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { setCurrentGame } = useGameStore();
 
-  const createGame = async () => {
+  const executeAction = async <T,>(
+    action: () => Promise<T>
+  ): Promise<T | null> => {
     if (!account) {
-      setError('No account connected');
-      return;
+      setError('Wallet not connected');
+      return null;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-
-      const worldAddress = import.meta.env.VITE_PUBLIC_WORLD_ADDRESS;
-
-      // Call create_game on the lobby system
-      const tx = await account.execute({
-        contractAddress: worldAddress,
-        entrypoint: 'create_game',
-        calldata: [],
-      });
-
-      console.log('Game created! Transaction:', tx.transaction_hash);
-      
-      // Wait for transaction
-      // await account.waitForTransaction(tx.transaction_hash);
-
-      return tx.transaction_hash;
-    } catch (err: any) {
-      console.error('Failed to create game:', err);
-      setError(err.message || 'Failed to create game');
-      throw err;
+      const result = await action();
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      console.error('Action failed:', err);
+      return null;
     } finally {
       setIsLoading(false);
     }
   };
 
+  const createGame = async () => {
+    if (!account) return null;
+    return executeAction(async () => {
+      const systemCalls = new SystemCalls({ account });
+      return await systemCalls.createGame();
+    });
+  };
+
   const joinGame = async (gameId: number) => {
-    if (!account) {
-      setError('No account connected');
-      return;
-    }
+    if (!account) return null;
+    return executeAction(async () => {
+      const systemCalls = new SystemCalls({ account });
+      return await systemCalls.joinGame(gameId);
+    });
+  };
 
-    try {
-      setIsLoading(true);
-      setError(null);
+  const placeUnits = async (
+    gameId: number,
+    positions: Array<{ x: number; y: number; unitType: number }>
+  ) => {
+    if (!account) return null;
+    return executeAction(async () => {
+      const systemCalls = new SystemCalls({ account });
+      return await systemCalls.placeUnits(gameId, positions);
+    });
+  };
 
-      const worldAddress = import.meta.env.VITE_PUBLIC_WORLD_ADDRESS;
+  const commitMoves = async (gameId: number, moves: PlannedMove[]) => {
+    if (!account) return null;
+    return executeAction(async () => {
+      const systemCalls = new SystemCalls({ account });
+      const formattedMoves = moves.map((m) => ({
+        unitId: m.unit_id,
+        action: getActionCode(m.action),
+        targetX: m.target_x,
+        targetY: m.target_y,
+      }));
+      return await systemCalls.commitMoves(gameId, formattedMoves);
+    });
+  };
 
-      const tx = await account.execute({
-        contractAddress: worldAddress,
-        entrypoint: 'join_game',
-        calldata: [gameId],
-      });
-
-      console.log('Joined game! Transaction:', tx.transaction_hash);
-
-      return tx.transaction_hash;
-    } catch (err: any) {
-      console.error('Failed to join game:', err);
-      setError(err.message || 'Failed to join game');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+  const executeTurn = async (gameId: number) => {
+    if (!account) return null;
+    return executeAction(async () => {
+      const systemCalls = new SystemCalls({ account });
+      return await systemCalls.executeTurn(gameId);
+    });
   };
 
   return {
     createGame,
     joinGame,
+    placeUnits,
+    commitMoves,
+    executeTurn,
     isLoading,
     error,
   };
-};
+}
+
+function getActionCode(action: string): number {
+  const codes: Record<string, number> = {
+    move: 0,
+    attack: 1,
+    defend: 2,
+  };
+  return codes[action] ?? 0;
+}

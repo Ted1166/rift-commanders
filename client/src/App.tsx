@@ -1,37 +1,24 @@
-import { Toaster } from "./components/ui/toaster";
-import { Toaster as Sonner } from "./components/ui/sonner";
-import { TooltipProvider } from "./components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Network from "./pages/Network";
-import Setup from "./pages/Setup";
-import Game from "./pages/Game";
-import Manual from "./pages/Manual";
-import Training from "./pages/Training";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { StarknetProvider } from './providers/StarknetProvider';
+import Home from './pages/Home';
+import Lobby from './components/lobby/Lobby';
+import Deploy from './pages/Deploy';
+import Game from './pages/Game';
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+function App() {
+  return (
+    <StarknetProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/network" element={<Network />} />
-          <Route path="/setup" element={<Setup />} />
-          <Route path="/game/:gameId" element={<Game />} />
-          <Route path="/manual" element={<Manual />} />
-          <Route path="/training" element={<Training />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+          <Route path="/lobby" element={<Lobby />} />
+          <Route path="/deploy/:gameId" element={<Deploy />} />
+          <Route path="/game/:gameId" element={<Game/>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </StarknetProvider>
+  );
+}
 
 export default App;

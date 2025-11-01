@@ -2,120 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
-  :root {
-    --background: 0 0% 3%;
-    --foreground: 120 100% 50%;
-
-    --card: 0 0% 8%;
-    --card-foreground: 120 100% 50%;
-
-    --popover: 0 0% 8%;
-    --popover-foreground: 120 100% 50%;
-
-    --primary: 120 100% 50%;
-    --primary-foreground: 0 0% 3%;
-
-    --secondary: 120 80% 25%;
-    --secondary-foreground: 120 100% 50%;
-
-    --muted: 120 20% 20%;
-    --muted-foreground: 120 30% 45%;
-
-    --accent: 120 100% 35%;
-    --accent-foreground: 120 100% 90%;
-
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 120 100% 30%;
-    --input: 120 100% 30%;
-    --ring: 120 100% 50%;
-
-    --radius: 0.25rem;
-    
-    --glow: 120 100% 50%;
-    --glow-intense: 120 100% 60%;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 0 0% 3%;
-    --foreground: 120 100% 50%;
-    --card: 0 0% 8%;
-    --card-foreground: 120 100% 50%;
-    --popover: 0 0% 8%;
-    --popover-foreground: 120 100% 50%;
-    --primary: 120 100% 50%;
-    --primary-foreground: 0 0% 3%;
-    --secondary: 120 80% 25%;
-    --secondary-foreground: 120 100% 50%;
-    --muted: 120 20% 20%;
-    --muted-foreground: 120 30% 45%;
-    --accent: 120 100% 35%;
-    --accent-foreground: 120 100% 90%;
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 120 100% 30%;
-    --input: 120 100% 30%;
-    --ring: 120 100% 50%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  /* ✅ REMOVED @apply - Using plain CSS instead */
   * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+    @apply box-border m-0 p-0;
   }
 
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    font-family: "JetBrains Mono", "Courier New", monospace;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    min-height: 100vh;
+    @apply bg-bg-primary text-tactical-green font-mono antialiased min-h-screen;
   }
 
   #root {
-    min-height: 100vh;
+    @apply min-h-screen;
   }
 }
 
 @layer utilities {
   .text-glow {
-    text-shadow: 0 0 10px hsl(var(--glow) / 0.5), 0 0 20px hsl(var(--glow) / 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5),
+                 0 0 20px rgba(0, 255, 65, 0.3);
   }
-  
+
   .text-glow-intense {
-    text-shadow: 0 0 10px hsl(var(--glow-intense)), 0 0 20px hsl(var(--glow-intense) / 0.5), 0 0 30px hsl(var(--glow-intense) / 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 65, 1),
+                 0 0 20px rgba(0, 255, 65, 0.5),
+                 0 0 30px rgba(0, 255, 65, 0.3);
   }
-  
+
   .border-glow {
-    box-shadow: 0 0 10px hsl(var(--glow) / 0.3), inset 0 0 10px hsl(var(--glow) / 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3),
+                inset 0 0 10px rgba(0, 255, 65, 0.1);
   }
-  
+
   .border-glow-intense {
-    box-shadow: 0 0 15px hsl(var(--glow-intense) / 0.5), 0 0 30px hsl(var(--glow-intense) / 0.2), inset 0 0 10px hsl(var(--glow) / 0.2);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.5),
+                0 0 30px rgba(0, 255, 65, 0.2),
+                inset 0 0 10px rgba(0, 255, 65, 0.2);
   }
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 255, 65, 0.05);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 65, 0.5);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Loading Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
