@@ -1,20 +1,24 @@
-import { DOJO_CONFIG } from '../constants';
+import { createDojoConfig } from '@dojoengine/core';
 
-export const dojoConfig = {
-  worldAddress: DOJO_CONFIG.worldAddress,
-  rpcUrl: DOJO_CONFIG.rpcUrl,
-  toriiUrl: DOJO_CONFIG.toriiUrl,
-  chainId: DOJO_CONFIG.chainId,
-} as const;
+// ✅ Production Dojo Configuration
+export const dojoConfig = createDojoConfig({
+  manifest: {
+    world: {
+      address: import.meta.env.VITE_PUBLIC_WORLD_ADDRESS,
+    },
+  },
+  rpcUrl: import.meta.env.VITE_PUBLIC_RPC_URL || 'https://api.cartridge.gg/x/starknet/sepolia',
+  toriiUrl: import.meta.env.VITE_PUBLIC_TORII_URL || 'https://api.cartridge.gg/x/rift-commanders/torii',
+});
 
-if (!dojoConfig.worldAddress) {
-  throw new Error('VITE_PUBLIC_WORLD_ADDRESS is not set');
-}
+// Contract addresses
+export const CONTRACTS = {
+  GAME_ACTIONS: import.meta.env.VITE_PUBLIC_GAME_ACTIONS_ADDRESS,
+  WORLD: import.meta.env.VITE_PUBLIC_WORLD_ADDRESS,
+};
 
-if (!dojoConfig.rpcUrl) {
-  throw new Error('VITE_PUBLIC_RPC_URL is not set');
-}
-
-if (!dojoConfig.toriiUrl) {
-  throw new Error('VITE_PUBLIC_TORII_URL is not set');
-}
+// Network configuration
+export const NETWORK = {
+  chainId: import.meta.env.VITE_PUBLIC_CHAIN_ID || 'SN_SEPOLIA',
+  name: 'Starknet Sepolia',
+};

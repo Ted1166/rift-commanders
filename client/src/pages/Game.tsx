@@ -5,10 +5,12 @@ import { useGameActions } from '../hooks';
 import { Button, Card, StatusBar } from '../components/ui';
 import { formatAddress } from '../utils';
 import { MOCK_MODE } from '../utils/mock';
-import { Crown, Sword, Target, Zap, Shield, Activity } from 'lucide-react';
-import { CombatLog, type LogEntry } from '../components/game/CombatLog';
-import { GameStats, GameOverModal } from '../components/game';
-
+import { soundManager, createDamageParticles, screenShake } from '../utils';
+import { Crown, Sword, Target, Zap, Shield, Activity, Volume2, VolumeX } from 'lucide-react';
+import { CombatLog, GameStats, GameOverModal, RewardsModal } from '../components/game';
+import { TutorialModal } from '../components/tutorial';
+import type { LogEntry } from '../components/game/CombatLog';
+import type { Reward } from '../types/rewards';
 
 type UnitType = 'commander' | 'warrior' | 'archer';
 type ActionType = 'move' | 'attack' | 'defend';
@@ -50,8 +52,15 @@ export default function Game() {
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<'player' | 'opponent' | null>(null);
   const [totalDamage, setTotalDamage] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showRewards, setShowRewards] = useState(false);
+  const [earnedRewards, setEarnedRewards] = useState<Reward[]>([]);
+  const [hasSeenTutorial, setHasSeenTutorial] = useState(false);
+  const [combatLog, setCombatLog] = useState<LogEntry[]>([
+    { id: 1, type: 'move', message: 'Game started. Plan your first move!', timestamp: Date.now() }
+  ]);
 
-  // Mock units for demo
   const [units, setUnits] = useState<Unit[]>([
     // Player units (bottom rows)
     { id: 1, type: 'commander', owner: 'player', health: 20, maxHealth: 20, position: { row: 4, col: 2 }, hasMoved: false },
@@ -63,9 +72,23 @@ export default function Game() {
     { id: 6, type: 'archer', owner: 'opponent', health: 10, maxHealth: 10, position: { row: 1, col: 3 }, hasMoved: false },
   ]);
 
-  const [combatLog, setCombatLog] = useState<LogEntry[]>([
-    { id: 1, type: 'move', message: 'Game started. Plan your first move!', timestamp: Date.now() }
-    ]);
+  const playerUnits = units.filter(u => u.owner === 'player' && u.health > 0);
+  const opponentUnits = units.filter(u => u.owner === 'opponent' && u.health > 0);
+
+  useEffect(() => {
+    const tutorialSeen = localStorage.getItem('rift_commanders_tutorial_seen');
+    if (!tutorialSeen) {
+      setShowTutorial(true);
+    } else {
+      setHasSeenTutorial(true);
+    }
+  }, []);
+
+  const toggleSound = () => {
+    const newState = soundManager.toggle();
+    setSoundEnabled(newState);
+    soundManager.buttonClick();
+  };
 
   const grid = Array(5).fill(null).map((_, row) =>
     Array(5).fill(null).map((_, col) => ({ row, col }))
@@ -80,14 +103,13 @@ export default function Game() {
 
     const clickedUnit = getUnitAt(row, col);
 
-    // Select unit
     if (clickedUnit && clickedUnit.owner === 'player' && !clickedUnit.hasMoved) {
       setSelectedUnit(clickedUnit);
       setSelectedAction(null);
+      soundManager.unitSelect();
       return;
     }
 
-    // Execute action
     if (selectedUnit && selectedAction) {
       const newMove: PlannedMove = {
         unitId: selectedUnit.id,
@@ -97,12 +119,11 @@ export default function Game() {
       };
 
       setPlannedMoves(prev => [...prev.filter(m => m.unitId !== selectedUnit.id), newMove]);
-      
-      // Mark unit as having moved
       setUnits(prev => prev.map(u => 
         u.id === selectedUnit.id ? { ...u, hasMoved: true } : u
       ));
 
+      soundManager.unitMove();
       setSelectedUnit(null);
       setSelectedAction(null);
     }
@@ -111,122 +132,234 @@ export default function Game() {
   const handleCommitMoves = async () => {
     if (plannedMoves.length === 0) return;
 
+    soundManager.commitMoves();
+
     const moves = plannedMoves.map(m => ({
-        unit_id: m.unitId,
-        action: m.action,
-        target_x: m.targetCol ?? 0,
-        target_y: m.targetRow ?? 0,
+      unit_id: m.unitId,
+      action: m.action,
+      target_x: m.targetCol ?? 0,
+      target_y: m.targetRow ?? 0,
     }));
 
     const txHash = await commitMoves(parseInt(gameId!), moves);
     if (txHash) {
-        setCombatLog(prev => [...prev, {
+      setCombatLog(prev => [...prev, {
         id: Date.now(),
         type: 'move',
         message: `You committed ${plannedMoves.length} move(s). Waiting for opponent...`,
         timestamp: Date.now()
-        }]);
-        setPhase('waiting');
+      }]);
+      setPhase('waiting');
     }
-    };
+  };
+
+  const generateRewards = (isVictory: boolean) => {
+    const rewards: Reward[] = [];
+    
+    if (isVictory) {
+      rewards.push({
+        id: 'xp_victory',
+        type: 'xp',
+        name: 'Victory XP',
+        description: 'Experience points for winning the battle',
+        amount: 100 + (currentTurn * 10),
+        rarity: 'common',
+        icon: '⭐',
+      });
+
+      rewards.push({
+        id: 'token_victory',
+        type: 'token',
+        name: 'RIFT Tokens',
+        description: 'Earned from dominating the battlefield',
+        amount: 50 + (playerUnits.length * 25),
+        rarity: 'rare',
+        icon: '💎',
+      });
+
+      if (playerUnits.length === 3) {
+        rewards.push({
+          id: 'perfect_victory',
+          type: 'achievement',
+          name: 'Flawless Victory',
+          description: 'Won without losing any units!',
+          rarity: 'epic',
+          icon: '🏆',
+        });
+      }
+
+      if (currentTurn <= 5) {
+        rewards.push({
+          id: 'quick_victory',
+          type: 'achievement',
+          name: 'Swift Strike',
+          description: 'Achieved victory in 5 turns or less',
+          rarity: 'rare',
+          icon: '⚡',
+        });
+      }
+    } else {
+      rewards.push({
+        id: 'xp_participation',
+        type: 'xp',
+        name: 'Battle XP',
+        description: 'Experience from combat participation',
+        amount: 25 + (currentTurn * 5),
+        rarity: 'common',
+        icon: '⭐',
+      });
+
+      if (opponentUnits.length < 3) {
+        rewards.push({
+          id: 'token_participation',
+          type: 'token',
+          name: 'RIFT Tokens',
+          description: 'Earned from dealing damage',
+          amount: 15,
+          rarity: 'common',
+          icon: '💎',
+        });
+      }
+    }
+
+    setEarnedRewards(rewards);
+    setTimeout(() => {
+      setShowRewards(true);
+    }, 2000);
+  };
 
   const handleExecuteTurn = async () => {
     const txHash = await executeTurn(parseInt(gameId!));
     if (txHash) {
-        setPhase('executing');
-        
-        setCombatLog(prev => [...prev, {
+      setPhase('executing');
+      soundManager.attack();
+      
+      setCombatLog(prev => [...prev, {
         id: Date.now(),
         type: 'attack',
         message: '⚔️ Turn executing... Resolving combat!',
         timestamp: Date.now()
-        }]);
+      }]);
 
-        // Simulate combat
-        setTimeout(() => {
-        // Random damage simulation
+      setTimeout(() => {
         const damage1 = Math.floor(Math.random() * 8) + 3;
         const damage2 = Math.floor(Math.random() * 6) + 2;
         
+        screenShake(400, 8);
+        
+        // ✅ Particle effects INSIDE handleExecuteTurn
+        const battlefield = document.querySelector('.battlefield-grid');
+        if (battlefield) {
+          const rect = battlefield.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          createDamageParticles(centerX + 50, centerY, damage1);
+          soundManager.damage();
+          
+          setTimeout(() => {
+            createDamageParticles(centerX - 50, centerY, damage2);
+            soundManager.damage();
+          }, 300);
+        }
+        
         setCombatLog(prev => [...prev, 
-            {
+          {
             id: Date.now() + 1,
             type: 'damage',
             message: `Your Warrior attacked Enemy Archer for ${damage1} damage!`,
             timestamp: Date.now()
-            },
-            {
+          },
+          {
             id: Date.now() + 2,
             type: 'damage',
             message: `Enemy Commander attacked your Warrior for ${damage2} damage!`,
             timestamp: Date.now()
-            }
+          }
         ]);
 
         setTotalDamage(prev => prev + damage1);
 
-        // Update unit health
         setUnits(prev => prev.map(u => {
-            if (u.id === 6 && u.owner === 'opponent') {
+          if (u.id === 6 && u.owner === 'opponent') {
             const newHealth = Math.max(0, u.health - damage1);
             return { ...u, health: newHealth };
-            }
-            if (u.id === 2 && u.owner === 'player') {
+          }
+          if (u.id === 2 && u.owner === 'player') {
             const newHealth = Math.max(0, u.health - damage2);
             return { ...u, health: newHealth };
-            }
-            return u;
+          }
+          return u;
         }));
 
-        // Check for game over (commander dead)
         setTimeout(() => {
-            const playerCommander = units.find(u => u.type === 'commander' && u.owner === 'player');
-            const opponentCommander = units.find(u => u.type === 'commander' && u.owner === 'opponent');
+          const playerCommander = units.find(u => u.type === 'commander' && u.owner === 'player');
+          const opponentCommander = units.find(u => u.type === 'commander' && u.owner === 'opponent');
 
-            if (playerCommander && playerCommander.health <= 0) {
+          if (playerCommander && playerCommander.health <= 0) {
+            soundManager.defeat();
             setWinner('opponent');
             setGameOver(true);
             setCombatLog(prev => [...prev, {
-                id: Date.now() + 3,
-                type: 'death',
-                message: '💀 Your Commander has fallen! DEFEAT!',
-                timestamp: Date.now()
+              id: Date.now() + 3,
+              type: 'death',
+              message: '💀 Your Commander has fallen! DEFEAT!',
+              timestamp: Date.now()
             }]);
-            } else if (opponentCommander && opponentCommander.health <= 0) {
+            generateRewards(false); // ✅ Call rewards
+          } else if (opponentCommander && opponentCommander.health <= 0) {
+            soundManager.victory();
             setWinner('player');
             setGameOver(true);
             setCombatLog(prev => [...prev, {
-                id: Date.now() + 3,
-                type: 'death',
-                message: '🎉 Enemy Commander eliminated! VICTORY!',
-                timestamp: Date.now()
+              id: Date.now() + 3,
+              type: 'death',
+              message: '🎉 Enemy Commander eliminated! VICTORY!',
+              timestamp: Date.now()
             }]);
-            } else {
+            generateRewards(true); // ✅ Call rewards
+          } else {
+            soundManager.turnComplete();
             setCombatLog(prev => [...prev, {
-                id: Date.now() + 3,
-                type: 'move',
-                message: 'Turn complete! Planning next turn...',
-                timestamp: Date.now()
+              id: Date.now() + 3,
+              type: 'move',
+              message: 'Turn complete! Planning next turn...',
+              timestamp: Date.now()
             }]);
             setCurrentTurn(prev => prev + 1);
             setPhase('planning');
             setPlannedMoves([]);
             setUnits(prev => prev.map(u => ({ ...u, hasMoved: false })));
-            }
+          }
         }, 1000);
-        }, 2000);
+      }, 2000);
     }
-    };
+  };
 
-  const playerUnits = units.filter(u => u.owner === 'player' && u.health > 0);
-  const opponentUnits = units.filter(u => u.owner === 'opponent' && u.health > 0);
-  const handlePlayAgain = () => {
-      navigate('/lobby');
-    };
+  const handleTutorialComplete = () => {
+    localStorage.setItem('rift_commanders_tutorial_seen', 'true');
+    setHasSeenTutorial(true);
+    soundManager.buttonClick();
+  };
 
-    const handleReturnToLobby = () => {
-      navigate('/lobby');
-    };
+  const handleRewardsClose = () => {
+    setShowRewards(false);
+    soundManager.buttonClick();
+  };
+
+  const handleActionSelect = (action: ActionType) => {
+    setSelectedAction(action);
+    soundManager.buttonClick();
+  };
+
+
+  function handleReturnToLobby(): void {
+    throw new Error('Function not implemented.');
+  }
+
+  function handlePlayAgain(): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -241,11 +374,37 @@ export default function Game() {
               Game #{gameId} • Turn {currentTurn}
             </span>
           </div>
-          {address && (
-            <span className="text-tactical-green text-sm font-mono">
-              {formatAddress(address)}
-            </span>
-          )}
+          <div className="flex items-center space-x-4">
+          {/* Tutorial Button */}
+          <button
+              onClick={() => {
+                setShowTutorial(true);
+                soundManager.buttonClick();
+              }}
+              className="text-tactical-green/60 hover:text-tactical-green transition-colors text-sm font-mono uppercase tracking-wider"
+            >
+              Tutorial
+            </button>
+        
+            {/* Sound Toggle */}
+            <button
+              onClick={toggleSound}
+              className="text-tactical-green/60 hover:text-tactical-green transition-colors"
+              title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-5 h-5" />
+              ) : (
+                <VolumeX className="w-5 h-5" />
+              )}
+            </button>
+
+            {address && (
+              <span className="text-tactical-green text-sm font-mono">
+                {formatAddress(address)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -374,7 +533,7 @@ export default function Game() {
                 </h3>
                 <div className="space-y-2">
                   <button
-                    onClick={() => setSelectedAction('move')}
+                    onClick={() => handleActionSelect('move')}
                     className={`
                       w-full border-2 rounded p-3 flex items-center space-x-3 transition-all
                       ${selectedAction === 'move' 
@@ -386,7 +545,7 @@ export default function Game() {
                     <span className="text-tactical-green text-sm font-bold uppercase">Move</span>
                   </button>
                   <button
-                    onClick={() => setSelectedAction('attack')}
+                    onClick={() => handleActionSelect('attack')}
                     className={`
                       w-full border-2 rounded p-3 flex items-center space-x-3 transition-all
                       ${selectedAction === 'attack' 
@@ -398,7 +557,7 @@ export default function Game() {
                     <span className="text-accent-red text-sm font-bold uppercase">Attack</span>
                   </button>
                   <button
-                    onClick={() => setSelectedAction('defend')}
+                    onClick={() => handleActionSelect('defend')}
                     className={`
                       w-full border-2 rounded p-3 flex items-center space-x-3 transition-all
                       ${selectedAction === 'defend' 
@@ -440,7 +599,7 @@ export default function Game() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-2 battlefield-grid">
                 {grid.map((row, rowIndex) =>
                   row.map((cell) => {
                     const unit = getUnitAt(cell.row, cell.col);
@@ -612,31 +771,50 @@ export default function Game() {
             )}
 
             {/* Game Controls */}
-            <div className="space-y-2">
-              <Button
-                onClick={() => navigate('/lobby')}
-                variant="secondary"
-                className="w-full"
-                size="sm"
-              >
-                Return to Lobby
-              </Button>
-
-              {/* Game Over Modal */}
-              <GameOverModal
-                isOpen={gameOver}
-                winner={winner}
-                playerKills={units.filter(u => u.owner === 'opponent' && u.health <= 0).length}
-                opponentKills={units.filter(u => u.owner === 'player' && u.health <= 0).length}
-                turnsPlayed={currentTurn}
-                damageDealt={totalDamage}
-                onPlayAgain={handlePlayAgain}
-                onReturnToLobby={handleReturnToLobby}
-                />
-              </div>
-            </div>
+            <Button
+              onClick={() => navigate('/lobby')}
+              variant="secondary"
+              className="w-full"
+              size="sm"
+            >
+              Return to Lobby
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* ✅ MODALS AT ROOT LEVEL - ONLY ONCE EACH! */}
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => {
+          setShowTutorial(false);
+          soundManager.buttonClick();
+        }}
+        onComplete={handleTutorialComplete}
+      />
+
+      <GameOverModal
+        isOpen={gameOver}
+        winner={winner}
+        playerKills={units.filter(u => u.owner === 'opponent' && u.health <= 0).length}
+        opponentKills={units.filter(u => u.owner === 'player' && u.health <= 0).length}
+        turnsPlayed={currentTurn}
+        damageDealt={totalDamage}
+        onPlayAgain={() => {
+          soundManager.buttonClick();
+          navigate('/lobby');
+        }}
+        onReturnToLobby={() => {
+          soundManager.buttonClick();
+          navigate('/lobby');
+        }}
+      />
+
+      <RewardsModal
+        isOpen={showRewards}
+        rewards={earnedRewards}
+        onClose={handleRewardsClose}
+      />
+    </div>
   );
 }
