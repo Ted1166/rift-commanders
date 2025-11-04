@@ -1,5 +1,5 @@
 // Mock mode for testing frontend without blockchain
-export const MOCK_MODE = false; // ✅ Set to true for testing
+export const MOCK_MODE = true; // ✅ Set to true for testing
 
 // export function generateMockTxHash(): string {
 //   return '0x' + Math.random().toString(16).substring(2, 66).padStart(64, '0');
