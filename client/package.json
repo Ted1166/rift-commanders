@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "echo 'Starting build...' && tsc --noEmit && echo 'TypeScript check passed' && vite build && echo 'Build completed!",
     "lint": "eslint .",
     "preview": "vite preview",
     "dev:https": "VITE_LOCAL_HTTPS=true vite",
